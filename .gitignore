@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+
+# Dados: nunca versionar. O dataset tem licença própria (CC BY-NC-SA 4.0) e é baixado à mão.
+dados/brutos/
+dados/*.duckdb
+dados/*.duckdb.wal
+
+# Segredos
+.env
+
+# Conjunto de teste em rascunho: só entra depois de aprovado pergunta a pergunta
+avaliacao/perguntas/teste-rascunho.jsonl
