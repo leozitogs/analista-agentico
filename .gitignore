@@ -13,6 +13,3 @@ dados/*.duckdb.wal
 
 # Segredos
 .env
-
-# Conjunto de teste em rascunho: só entra depois de aprovado pergunta a pergunta
-avaliacao/perguntas/teste-rascunho.jsonl

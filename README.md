@@ -26,7 +26,8 @@ O plano completo, com critérios de sucesso escritos antes de qualquer medição
 | Modelo local | `src/analista/provedor.py` (`ProvedorOllama`) | O mesmo agente roda num modelo servido pelo Ollama, sem cota e sem custo por chamada. Basta usar `ollama:<nome>` como modelo |
 | Verificação de números | `src/analista/verificar.py` | Todo número do texto final precisa estar no resultado da consulta |
 | Avaliação | `src/analista/avaliar.py` | Acerto por nível, linha de base sem ferramentas (modo `direto`) e rastro completo de cada execução |
-| Perguntas | `avaliacao/perguntas/desenvolvimento.jsonl` | 20 perguntas: 16 com SQL de gabarito em três níveis, 2 sem resposta nos dados, 2 ambíguas |
+| Perguntas de desenvolvimento | `avaliacao/perguntas/desenvolvimento.jsonl` | 20 perguntas, usadas para construir e ajustar |
+| Perguntas de teste | `avaliacao/perguntas/teste.jsonl` | 60 perguntas, congeladas por hash antes da primeira rodada: 44 com SQL de gabarito em três níveis, 8 sem resposta nos dados, 8 ambíguas ([como foram feitas](docs/processo/B1-conjunto-de-teste.md)) |
 
 ## Rodar
 

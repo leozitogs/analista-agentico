@@ -10,7 +10,10 @@ from analista.perguntas import ler
 
 RAIZ = Path(__file__).resolve().parents[1]
 BANCO = RAIZ / "dados" / "olist.duckdb"
-PERGUNTAS = ler(RAIZ / "avaliacao/perguntas/desenvolvimento.jsonl")
+PERGUNTAS = [
+    *ler(RAIZ / "avaliacao/perguntas/desenvolvimento.jsonl"),
+    *ler(RAIZ / "avaliacao/perguntas/teste.jsonl"),
+]
 
 pytestmark = pytest.mark.skipif(not BANCO.is_file(), reason="dataset real não carregado")
 
