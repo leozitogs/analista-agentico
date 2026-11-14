@@ -1,9 +1,13 @@
 # Analista de dados agêntico
 
-> **Em construção.** Existem a base (banco, política de SQL, ferramentas, comparador) e o
-> agente com sua avaliação. Só há números do conjunto de desenvolvimento, que não servem
-> para dizer quão bom o agente é ([resultados](resultados/README.md)). O conjunto de teste
-> ainda não existe.
+> **Em construção.** Faltam os ataques de injeção pelos dados e a demo.
+>
+> **Resultado no conjunto de teste** (60 perguntas congeladas antes da rodada, Gemini 3.5
+> Flash Lite, uma rodada): o agente acertou 39 de 44 consultas (88,6%) e a linha de base,
+> que faz uma consulta só e não usa ferramentas, acertou 41 de 44 (93,2%). **O agente não
+> foi melhor que a linha de base**, e gastou o dobro de tokens. Dos seis critérios do
+> plano, quatro foram atingidos, um não foi e um ainda não foi medido.
+> [Números, leitura e limites](resultados/README.md).
 
 Um agente que responde perguntas de negócio em português sobre um dataset público
 brasileiro de marketplace: escreve SQL somente leitura, executa, e devolve a resposta com
@@ -76,8 +80,9 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollam
 
 ## O que falta
 
-- Revisão humana dos 16 gabaritos (já executam no dataset real, com valores plausíveis).
-- As 60 perguntas de teste e a medição que conta (B1).
+- Revisão humana do SQL dos gabaritos (o revisor viu as perguntas e as respostas, não o SQL).
+- Testar a hipótese de por que o agente não ganha: rodar os dois modos sem o dicionário de dados no prompt.
+- Medir a variação entre rodadas.
 - Os ataques de injeção pelos dados, a demo e o relatório (B2).
 
 ## Limitações conhecidas
@@ -86,7 +91,7 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollam
 - **Consulta cara:** o tempo limite interrompe a consulta, mas até lá ela ocupa processador e memória. Não exponha isto a usuários não confiáveis sem isolamento de processo.
 - **Comparador:** se o agente arredonda o resultado, uma consulta errada que só difere depois da casa arredondada passa como acerto.
 - **Verificação de números:** aceita a contagem de linhas do resultado como origem de um número; não reconhece porcentagem escrita a partir de fração (8,1% para 0,081) nem número por extenso; não é aplicada a respostas do tipo "sem resposta" e "esclarecimento".
-- **Medição:** só existe o conjunto de desenvolvimento, uma rodada por modelo, dois modelos.
+- **Medição:** uma rodada por configuração; 44 perguntas com SQL dão intervalos largos.
 
 ## Dados e licenças
 
