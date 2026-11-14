@@ -137,6 +137,7 @@ class Execucao(BaseModel):
     numeros_sem_origem: list[str] = []
     passos: list[Passo] = []
     chamadas_ao_modelo: int = 0
+    chamadas_lidas_do_texto: int = 0  # o modelo escreveu a chamada como texto
     tokens_entrada: int = 0
     tokens_saida: int = 0
     duracao_ms: int = 0
@@ -177,6 +178,7 @@ class Agente:
         execucao = Execucao(pergunta=pergunta, modo=self.modo, provedor=self.provedor.nome)
         conteudos: list[Json] = [turno_usuario(pergunta)]
         correcoes_de_numero = 0
+        lidas_antes = int(getattr(self.provedor, "chamadas_lidas_do_texto", 0))
         try:
             while execucao.chamadas_ao_modelo < self.max_chamadas:
                 resposta = self.provedor.gerar(self.sistema, conteudos, self.declaracoes)
@@ -213,6 +215,9 @@ class Agente:
             raise  # não é falha do agente; quem avalia precisa parar
         except ErroDeProvedor as erro:
             execucao.erro = f"provedor: {erro}"
+        execucao.chamadas_lidas_do_texto = (
+            int(getattr(self.provedor, "chamadas_lidas_do_texto", 0)) - lidas_antes
+        )
         execucao.duracao_ms = int((time.monotonic() - inicio) * 1000)
         return execucao
 

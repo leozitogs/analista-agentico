@@ -33,6 +33,6 @@ Quatro variantes do Qwen de 4 bilhões de parâmetros no Ollama (nenhum Llama). 
 ## O que não foi verificado
 
 1. Uma rodada por modo. A variação entre rodadas existe (ver `resultados/README.md`) e não foi medida.
-2. O contador de chamadas lidas do texto existe no provedor, mas **ainda não é gravado no rastro**: não dá para dizer, a partir dos arquivos, em quantas perguntas a leitura foi usada.
+2. O contador de chamadas lidas do texto passou a ser gravado no rastro de cada pergunta, mas **só em rodadas novas**: os arquivos de 13 e 14/11 foram gerados antes e não têm esse número.
 3. A linha de base local pede esclarecimento para quase tudo. Não investiguei se é o prompt ou o modelo.
 4. Só um modelo local foi medido.

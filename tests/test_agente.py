@@ -1,5 +1,6 @@
 """O laço do agente, com um modelo roteirizado. Nenhuma chamada de rede."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -251,3 +252,35 @@ def test_rastro_e_gravado_pergunta_a_pergunta_e_erro_interno_vira_falha(
     assert [x.acertou for x in linhas] == [True, False]
     assert "erro interno: RuntimeError" in linhas[1].motivo and resumo.falhas == 1
     assert len(saida.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_rastro_guarda_so_uma_amostra_do_resultado(
+    ferramentas: Ferramentas, tmp_path: Path
+) -> None:
+    """Um arquivo de resultados publicado não pode virar cópia de linhas do dataset."""
+    tudo = "SELECT pedido_id FROM pedidos"
+    perguntas = [Pergunta(id="x", nivel=1, tipo="sql", pergunta="Liste os pedidos.", sql=tudo)]
+    agente, _ = novo(ferramentas, [responder("resposta", "Segue a lista.", tudo)])
+    saida = tmp_path / "rastros.jsonl"
+    resumo, linhas = avaliar(agente, perguntas, ferramentas, saida)
+    assert resumo.acertos == 1  # o julgamento usa o resultado inteiro
+    assert linhas[0].execucao.resultado is not None
+    assert len(linhas[0].execucao.resultado.linhas) == 300
+    gravado = json.loads(saida.read_text(encoding="utf-8"))["execucao"]["resultado"]
+    assert len(gravado["linhas"]) == 50 and gravado["linhas_omitidas_do_rastro"] == 250
+
+
+def test_execucao_registra_as_chamadas_lidas_do_texto(ferramentas: Ferramentas) -> None:
+    class ComContador(ProvedorRoteirizado):
+        chamadas_lidas_do_texto = 0
+
+        def gerar(self, sistema: Any, conteudos: Any, ferramentas: Any) -> Any:
+            self.chamadas_lidas_do_texto += 1
+            return super().gerar(sistema, conteudos, ferramentas)
+
+    certa = "SELECT count(*) FROM pedidos"
+    provedor = ComContador([chamar("listar_tabelas"), responder("resposta", "300.", certa)])
+    agente = Agente(provedor, ferramentas, dicionario="(teste)")
+    assert agente.perguntar("Quantos pedidos?").chamadas_lidas_do_texto == 2
+    provedor._roteiro.append(responder("resposta", "300.", certa))
+    assert agente.perguntar("Quantos pedidos?").chamadas_lidas_do_texto == 1  # por pergunta

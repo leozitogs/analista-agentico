@@ -25,6 +25,10 @@ from .perguntas import Pergunta
 from .politica import ConsultaRecusada
 from .provedor import ErroDeCota
 
+# O rastro é publicado. Ele guarda só as primeiras linhas de cada resultado, para que
+# um arquivo de resultados nunca vire uma cópia de linhas do dataset.
+MAX_LINHAS_NO_RASTRO = 50
+
 _ESPERADO = {"sql": "resposta", "sem_resposta": "sem_resposta", "ambigua": "esclarecimento"}
 
 
@@ -46,6 +50,7 @@ class Resumo(BaseModel):
     numeros_sem_origem: int
     falhas: int
     chamadas_ao_modelo: int
+    chamadas_lidas_do_texto: int = 0
     tokens_entrada: int
     tokens_saida: int
     duracao_media_ms: int
@@ -69,6 +74,16 @@ def julgar(pergunta: Pergunta, execucao: Execucao, ferramentas: Ferramentas) -> 
         f"resultado diferente do gabarito ({len(execucao.resultado.linhas)} x "
         f"{len(gabarito.linhas)} linhas)"
     )
+
+
+def para_rastro(linha: Linha) -> dict[str, object]:
+    """A linha como vai para o arquivo: resultado limitado a uma amostra."""
+    dados = linha.model_dump()
+    resultado = dados["execucao"]["resultado"]
+    if resultado is not None and len(resultado["linhas"]) > MAX_LINHAS_NO_RASTRO:
+        resultado["linhas_omitidas_do_rastro"] = len(resultado["linhas"]) - MAX_LINHAS_NO_RASTRO
+        resultado["linhas"] = resultado["linhas"][:MAX_LINHAS_NO_RASTRO]
+    return dados
 
 
 def conferir_gabaritos(perguntas: list[Pergunta], juiz: Ferramentas) -> None:
@@ -120,7 +135,7 @@ def avaliar(
                           acertou=acertou, motivo=motivo, execucao=execucao)
             linhas.append(linha)
             if arquivo is not None:
-                arquivo.write(json.dumps(linha.model_dump(), ensure_ascii=False) + "\n")
+                arquivo.write(json.dumps(para_rastro(linha), ensure_ascii=False) + "\n")
                 arquivo.flush()
     finally:
         if arquivo is not None:
@@ -146,6 +161,7 @@ def resumir(agente: Agente, linhas: list[Linha]) -> Resumo:
         numeros_sem_origem=sum(bool(e.numeros_sem_origem) for e in execucoes),
         falhas=sum(e.tipo == "falha" for e in execucoes),
         chamadas_ao_modelo=sum(e.chamadas_ao_modelo for e in execucoes),
+        chamadas_lidas_do_texto=sum(e.chamadas_lidas_do_texto for e in execucoes),
         tokens_entrada=sum(e.tokens_entrada for e in execucoes),
         tokens_saida=sum(e.tokens_saida for e in execucoes),
         duracao_media_ms=int(sum(e.duracao_ms for e in execucoes) / len(execucoes))

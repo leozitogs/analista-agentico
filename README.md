@@ -91,6 +91,7 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollam
 
 - **Código:** Apache-2.0 ([LICENSE](LICENSE)).
 - **Dados:** [Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce), publicado no Kaggle sob [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). O dataset **não** está neste repositório.
+- **Rastros:** cada rastro guarda no máximo 50 linhas do resultado de uma consulta; o julgamento usa o resultado inteiro.
 - **Derivados dos dados:** os arquivos em `resultados/` (resultados de consultas) e as estatísticas citadas em `docs/dicionario-de-dados.md` derivam desse dataset e ficam sob a mesma licença CC BY-NC-SA 4.0: atribuição à Olist, uso não comercial, mesma licença para obras derivadas.
 
 ## Como este repositório é construído
