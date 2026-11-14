@@ -43,12 +43,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     pe = comandos.add_parser("perguntar", help="faz uma pergunta ao agente")
     pe.add_argument("pergunta")
     pe.add_argument("--modo", choices=["agente", "direto"], default="agente")
+    pe.add_argument("--contexto", choices=["completo", "esquema", "nenhum"], default="completo")
     pe.add_argument("--modelo", default=None)
     pe.add_argument("--banco", type=Path, default=BANCO_PADRAO)
 
     av = comandos.add_parser("avaliar", help="roda um conjunto de perguntas e mede o acerto")
     av.add_argument("arquivo", type=Path)
     av.add_argument("--modo", choices=["agente", "direto"], default="agente")
+    av.add_argument("--contexto", choices=["completo", "esquema", "nenhum"], default="completo")
     av.add_argument("--modelo", default=None)
     av.add_argument("--saida", type=Path, default=None, help="JSONL com os rastros")
     av.add_argument("--banco", type=Path, default=BANCO_PADRAO)
@@ -75,7 +77,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.comando in ("perguntar", "avaliar"):
             try:
-                agente = Agente(criar_provedor(args.modelo), ferramentas, modo=args.modo)
+                agente = Agente(
+                    criar_provedor(args.modelo), ferramentas, modo=args.modo,
+                    contexto=args.contexto,
+                )
             except ErroDeProvedor as erro:
                 print(erro)
                 return 1

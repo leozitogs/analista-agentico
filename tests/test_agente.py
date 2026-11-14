@@ -284,3 +284,25 @@ def test_execucao_registra_as_chamadas_lidas_do_texto(ferramentas: Ferramentas) 
     assert agente.perguntar("Quantos pedidos?").chamadas_lidas_do_texto == 2
     provedor._roteiro.append(responder("resposta", "300.", certa))
     assert agente.perguntar("Quantos pedidos?").chamadas_lidas_do_texto == 1  # por pergunta
+
+
+def test_niveis_de_contexto_do_banco(ferramentas: Ferramentas) -> None:
+    def sistema(nivel: str) -> str:
+        return Agente(ProvedorRoteirizado([]), ferramentas, contexto=nivel).sistema  # type: ignore[arg-type]
+
+    completo, esquema, nenhum = sistema("completo"), sistema("esquema"), sistema("nenhum")
+    assert "Armadilhas dos dados reais" in completo
+    assert "itens_pedido(" in esquema and "preco DECIMAL" in esquema
+    assert "Armadilhas" not in esquema and "pessoa_id" in esquema
+    assert "Visões disponíveis: avaliacoes, clientes" in nenhum
+    assert "pessoa_id" not in nenhum and "DECIMAL" not in nenhum
+    assert len(nenhum) < len(esquema) < len(completo)
+
+
+def test_execucao_e_resumo_registram_o_contexto(ferramentas: Ferramentas) -> None:
+    certa = "SELECT count(*) FROM pedidos"
+    provedor = ProvedorRoteirizado([responder("resposta", "300.", certa)])
+    agente = Agente(provedor, ferramentas, contexto="esquema")
+    perguntas = [Pergunta(id="x", nivel=1, tipo="sql", pergunta="Quantos pedidos?", sql=certa)]
+    resumo, linhas = avaliar(agente, perguntas, ferramentas)
+    assert linhas[0].execucao.contexto == "esquema" and resumo.contexto == "esquema"

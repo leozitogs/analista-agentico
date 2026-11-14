@@ -38,6 +38,7 @@ from .provedor import (
 from .verificar import numeros_sem_origem
 
 Modo = Literal["agente", "direto"]
+Contexto = Literal["completo", "esquema", "nenhum"]
 TipoResposta = Literal["resposta", "sem_resposta", "esclarecimento", "falha"]
 
 MAX_LINHAS_FINAL = 5000  # a consulta final não entra no contexto do modelo
@@ -129,6 +130,7 @@ class Execucao(BaseModel):
 
     pergunta: str
     modo: Modo
+    contexto: Contexto = "completo"  # quanto da documentação do banco foi para o prompt
     provedor: str
     tipo: TipoResposta = "falha"
     texto: str = ""
@@ -152,6 +154,25 @@ def dicionario_resumido(caminho: Path | None = None) -> str:
     return texto.split("## Fora das visões")[0].strip()
 
 
+def contexto_do_banco(nivel: Contexto, ferramentas: Ferramentas) -> str:
+    """O que o modelo recebe sobre o banco, antes de qualquer ferramenta.
+
+    * ``completo`` - o dicionário de dados: colunas, significados e armadilhas.
+    * ``esquema``  - só nomes de visões, colunas e tipos, lidos do próprio banco.
+    * ``nenhum``   - só os nomes das visões.
+    """
+    if nivel == "completo":
+        return dicionario_resumido()
+    nomes = ferramentas.listar_tabelas()
+    if nivel == "nenhum":
+        return "Visões disponíveis: " + ", ".join(nomes) + "."
+    linhas = ["Visões disponíveis, com colunas e tipos:", ""]
+    for nome in nomes:
+        colunas = ", ".join(f"{c.nome} {c.tipo}" for c in ferramentas.descrever_tabela(nome))
+        linhas.append(f"- {nome}({colunas})")
+    return "\n".join(linhas)
+
+
 class Agente:
     def __init__(
         self,
@@ -160,13 +181,17 @@ class Agente:
         *,
         modo: Modo = "agente",
         max_chamadas: int = 10,
+        contexto: Contexto = "completo",
         dicionario: str | None = None,
     ) -> None:
         self.provedor = provedor
         self.ferramentas = ferramentas
         self.modo: Modo = modo
         self.max_chamadas = max_chamadas
-        self.sistema = SISTEMA.format(dicionario=dicionario or dicionario_resumido())
+        self.contexto: Contexto = contexto
+        self.sistema = SISTEMA.format(
+            dicionario=dicionario or contexto_do_banco(contexto, ferramentas)
+        )
         self.declaracoes = (
             [*FERRAMENTAS_DE_INSPECAO, FERRAMENTA_RESPONDER]
             if modo == "agente"
@@ -175,7 +200,9 @@ class Agente:
 
     def perguntar(self, pergunta: str) -> Execucao:
         inicio = time.monotonic()
-        execucao = Execucao(pergunta=pergunta, modo=self.modo, provedor=self.provedor.nome)
+        execucao = Execucao(
+            pergunta=pergunta, modo=self.modo, contexto=self.contexto, provedor=self.provedor.nome
+        )
         conteudos: list[Json] = [turno_usuario(pergunta)]
         correcoes_de_numero = 0
         lidas_antes = int(getattr(self.provedor, "chamadas_lidas_do_texto", 0))

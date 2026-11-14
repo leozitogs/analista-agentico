@@ -44,6 +44,7 @@ class Linha(BaseModel):
 class Resumo(BaseModel):
     provedor: str
     modo: str
+    contexto: str = "completo"
     total: int
     acertos: int
     por_grupo: dict[str, tuple[int, int]]  # grupo -> (acertos, total)
@@ -127,7 +128,8 @@ def avaliar(
                 break
             except Exception as erro:  # noqa: BLE001 - defeito nosso vira falha registrada
                 execucao = Execucao(
-                    pergunta=pergunta.pergunta, modo=agente.modo, provedor=agente.provedor.nome,
+                    pergunta=pergunta.pergunta, modo=agente.modo, contexto=agente.contexto,
+                    provedor=agente.provedor.nome,
                     erro=f"erro interno: {type(erro).__name__}: {erro}",
                 )
             acertou, motivo = julgar(pergunta, execucao, juiz)
@@ -155,6 +157,7 @@ def resumir(agente: Agente, linhas: list[Linha]) -> Resumo:
     return Resumo(
         provedor=agente.provedor.nome,
         modo=agente.modo,
+        contexto=agente.contexto,
         total=len(linhas),
         acertos=sum(linha.acertou for linha in linhas),
         por_grupo={g: (sum(v), len(v)) for g, v in sorted(grupos.items())},
