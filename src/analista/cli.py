@@ -14,7 +14,7 @@ from .banco import carregar
 from .ferramentas import ErroDeConsulta, Ferramentas
 from .perguntas import ler
 from .politica import ConsultaRecusada
-from .provedor import ErroDeProvedor, ProvedorGemini, listar_modelos
+from .provedor import ErroDeProvedor, criar_provedor, listar_modelos
 
 BANCO_PADRAO = Path("dados/olist.duckdb")
 
@@ -75,7 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.comando in ("perguntar", "avaliar"):
             try:
-                agente = Agente(ProvedorGemini(args.modelo), ferramentas, modo=args.modo)
+                agente = Agente(criar_provedor(args.modelo), ferramentas, modo=args.modo)
             except ErroDeProvedor as erro:
                 print(erro)
                 return 1

@@ -23,6 +23,7 @@ O plano completo, com critérios de sucesso escritos antes de qualquer medição
 | Ferramentas | `src/analista/ferramentas.py` | Listar, descrever, amostrar e executar, com limite de linhas e de tempo |
 | Comparador | `src/analista/comparar.py` | Acerto de execução sem crédito parcial; tolerância numérica relativa, com arredondamento aceito a partir de 2 casas |
 | Agente | `src/analista/agente.py`, `provedor.py` | Um laço com Gemini pela API REST. Termina com uma resposta tipada: resposta, sem resposta ou pedido de esclarecimento. A consulta final passa pela política e é executada pelo agente |
+| Modelo local | `src/analista/provedor.py` (`ProvedorOllama`) | O mesmo agente roda num modelo servido pelo Ollama, sem cota e sem custo por chamada. Basta usar `ollama:<nome>` como modelo |
 | Verificação de números | `src/analista/verificar.py` | Todo número do texto final precisa estar no resultado da consulta |
 | Avaliação | `src/analista/avaliar.py` | Acerto por nível, linha de base sem ferramentas (modo `direto`) e rastro completo de cada execução |
 | Perguntas | `avaliacao/perguntas/desenvolvimento.jsonl` | 20 perguntas: 16 com SQL de gabarito em três níveis, 2 sem resposta nos dados, 2 ambíguas |
@@ -65,6 +66,13 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --saida result
 uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modo direto --saida resultados/dev-direto.jsonl
 ```
 
+Com um modelo local, no lugar das duas variáveis do Gemini:
+
+```bash
+uv run analista perguntar "Quantos pedidos foram cancelados?" --modelo ollama:qwen3:4b-instruct
+uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollama:qwen3:4b-instruct
+```
+
 ## O que falta
 
 - Revisão humana dos 16 gabaritos (já executam no dataset real, com valores plausíveis).
@@ -77,7 +85,7 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modo direto 
 - **Consulta cara:** o tempo limite interrompe a consulta, mas até lá ela ocupa processador e memória. Não exponha isto a usuários não confiáveis sem isolamento de processo.
 - **Comparador:** se o agente arredonda o resultado, uma consulta errada que só difere depois da casa arredondada passa como acerto.
 - **Verificação de números:** aceita a contagem de linhas do resultado como origem de um número; não reconhece porcentagem escrita a partir de fração (8,1% para 0,081) nem número por extenso; não é aplicada a respostas do tipo "sem resposta" e "esclarecimento".
-- **Medição:** só existe o conjunto de desenvolvimento, uma rodada, um modelo.
+- **Medição:** só existe o conjunto de desenvolvimento, uma rodada por modelo, dois modelos.
 
 ## Dados e licenças
 

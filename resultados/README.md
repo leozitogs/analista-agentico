@@ -45,6 +45,54 @@ nenhum acerto mudou.
   nenhuma resposta teve número sem origem.
 - Uma falha da linha de base (`d19`) foi do provedor: o modelo devolveu resposta vazia.
 
+## 13 e 14/11/2026 · modelo local `qwen3:4b-instruct` (Ollama, Q4_K_M, contexto de 8k), temperatura 0, uma rodada
+
+Mesmo conjunto de desenvolvimento, mesmo prompt, mesma avaliação. Roda numa placa de 6 GB,
+sem cota e sem custo por chamada.
+
+| | Agente | Linha de base |
+|---|---:|---:|
+| Acerto geral | 6 / 20 | 5 / 20 |
+| Nível 1 | 4 / 6 | 2 / 6 |
+| Nível 2 | 0 / 6 | 0 / 6 |
+| Nível 3 | 0 / 4 | 0 / 4 |
+| Sem resposta nos dados | 2 / 2 | 1 / 2 |
+| Ambíguas | 0 / 2 | 2 / 2 |
+| Chamadas ao modelo | 139 | 22 |
+| Tokens de entrada / saída | 402.262 / 28.124 | 36.398 / 2.814 |
+| Duração média por pergunta | 46 s | 5 s |
+
+Rastros: `dev-agente-qwen3-4b.jsonl` e `dev-direto-qwen3-4b.jsonl`.
+
+### Leitura
+
+- **O modelo de 4 bilhões de parâmetros não dá conta da tarefa além do nível 1.** Nenhum
+  acerto em junções nem em consultas de nível 3, nos dois modos.
+- **Como o agente falha:** em 8 das 20 perguntas ele bate no teto de 10 chamadas sem
+  encerrar. O modelo executa consultas, mas não consegue fechar com a chamada `responder`.
+  Uma falha foi do provedor (HTTP 400 do Ollama).
+- **Como a linha de base falha:** em 12 perguntas respondíveis ela pede esclarecimento em
+  vez de responder. Por isso "acerta" as duas ambíguas: não é discernimento, é o
+  comportamento padrão dela. É um exemplo de por que o acerto por tipo de pergunta precisa
+  ser lido junto com os erros.
+- **Chamada escrita como texto:** este modelo muitas vezes escreve `responder({...})` como
+  texto em vez de usar a chamada estruturada. O provedor local reconhece essa forma (só
+  quando o texto inteiro é a chamada, de uma ferramenta declarada, com JSON válido). Sem
+  isso, o acerto do agente seria ainda menor.
+- **Variação entre rodadas:** uma rodada anterior da linha de base, interrompida na
+  penúltima pergunta, tinha 3 acertos em 19; esta teve 5 em 20. Mesmo com temperatura 0 há
+  variação, e uma rodada só não a mede.
+
+### Comparação entre os dois modelos (só desenvolvimento)
+
+| | `gemini-3.5-flash-lite` | `qwen3:4b-instruct` local |
+|---|---:|---:|
+| Agente | 17 / 20 | 6 / 20 |
+| Linha de base | 14 / 20 | 5 / 20 |
+
+A diferença entre os modelos é muito maior que a diferença entre os modos. Com estas 20
+perguntas, é a única conclusão que os números sustentam.
+
 ### O que não está aqui
 
 - Rodada com um modelo Flash: a camada gratuita limita a 20 pedidos por dia, e a tentativa

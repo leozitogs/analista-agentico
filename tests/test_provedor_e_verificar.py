@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import pytest
@@ -7,7 +8,11 @@ from analista.provedor import (
     ErroDeProvedor,
     ErroPassageiro,
     ProvedorGemini,
+    ProvedorOllama,
+    chamada_escrita_como_texto,
+    criar_provedor,
     interpretar,
+    para_mensagens,
     turno_resultados,
     turno_usuario,
 )
@@ -167,3 +172,110 @@ def test_chamada_de_funcao_malformada_e_erro_do_provedor() -> None:
     for resposta in (sem_nome, args_errados):
         with pytest.raises(ErroDeProvedor, match="malformada"):
             interpretar(resposta)
+
+
+# ---------- modelo local
+
+def test_conversa_no_formato_do_gemini_vira_mensagens_de_chat() -> None:
+    conteudos = [
+        turno_usuario("Quantos pedidos?"),
+        {"role": "model", "parts": [
+            {"functionCall": {"name": "executar_sql", "args": {"sql": "SELECT 1"}},
+             "thoughtSignature": "abc"}]},
+        turno_resultados([("executar_sql", {"dados": {"linhas": [[1]]}})]),
+    ]
+    mensagens = para_mensagens("sistema", conteudos)
+    assert [m["role"] for m in mensagens] == ["system", "user", "assistant", "tool"]
+    assert mensagens[2]["tool_calls"][0]["function"] == {
+        "name": "executar_sql", "arguments": {"sql": "SELECT 1"}}
+    assert mensagens[3]["tool_name"] == "executar_sql"
+    assert json.loads(mensagens[3]["content"]) == {"dados": {"linhas": [[1]]}}
+
+
+def test_provedor_local_traduz_o_pedido_e_a_resposta() -> None:
+    visto: dict[str, Any] = {}
+
+    argumentos_em_texto = '{"tipo": "resposta", "texto": "x"}'
+
+    def transporte(url: str, corpo: dict[str, Any], cabecalhos: dict[str, str], t: float) -> Any:
+        visto.update(url=url, corpo=corpo)
+        return {"message": {"role": "assistant", "content": "", "tool_calls": [
+            {"function": {"name": "responder", "arguments": argumentos_em_texto}}]},
+            "prompt_eval_count": 40, "eval_count": 9}
+
+    provedor = ProvedorOllama("modelo-local", transporte=transporte)
+    declaracao = {"name": "responder", "description": "d", "parameters": {
+        "type": "OBJECT", "properties": {"tipo": {"type": "STRING", "enum": ["resposta"]}},
+        "required": ["tipo"]}}
+    resposta = provedor.gerar("sistema", [turno_usuario("oi")], [declaracao])
+
+    assert visto["url"].endswith("/api/chat") and visto["corpo"]["stream"] is False
+    parametros = visto["corpo"]["tools"][0]["function"]["parameters"]
+    assert parametros["type"] == "object"
+    assert parametros["properties"]["tipo"] == {"type": "string", "enum": ["resposta"]}
+    # argumentos que vieram como texto JSON viram dicionário
+    assert resposta.chamadas[0].argumentos == {"tipo": "resposta", "texto": "x"}
+    assert resposta.conteudo["parts"][0]["functionCall"]["name"] == "responder"
+    assert (resposta.tokens_entrada, resposta.tokens_saida) == (40, 9)
+    assert provedor.nome == "ollama:modelo-local"
+
+
+def test_provedor_local_recusa_resposta_vazia_ou_malformada() -> None:
+    def vazio(url: str, corpo: Any, cabecalhos: Any, t: float) -> Any:
+        return {"message": {"role": "assistant", "content": ""}}
+
+    def torto(url: str, corpo: Any, cabecalhos: Any, t: float) -> Any:
+        return {"message": {"content": "", "tool_calls": [
+            {"function": {"name": "responder", "arguments": "isto não é json"}}]}}
+
+    with pytest.raises(ErroDeProvedor, match="vazia"):
+        ProvedorOllama("m", transporte=vazio).gerar("s", [], [])
+    with pytest.raises(ErroDeProvedor, match="malformada"):
+        ProvedorOllama("m", transporte=torto).gerar("s", [], [])
+
+
+def test_prefixo_ollama_escolhe_o_provedor_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert criar_provedor("ollama:qwen3:4b-instruct").nome == "ollama:qwen3:4b-instruct"
+    assert criar_provedor("gemini-x").nome == "gemini:gemini-x"
+    monkeypatch.setenv("ANALISTA_MODELO", "ollama:m")
+    assert criar_provedor().nome == "ollama:m"
+
+
+NOMES = frozenset({"responder", "executar_sql"})
+
+
+@pytest.mark.parametrize("texto", [
+    'responder({"tipo": "resposta", "texto": "625 pedidos.", "sql": "SELECT 1"})',
+    '  responder(\n{"tipo": "resposta",\n "texto": "625 (seiscentos) pedidos."}\n)  ',
+    '```json\nresponder({"tipo": "sem_resposta", "texto": "não há"})\n```',
+    'responder {\n  "tipo": "resposta",\n  "texto": "Os 10 vendedores são..."\n}',
+    '<tool_call>{"name": "responder", "arguments": {"tipo": "resposta", "texto": "x"}}</tool_call>',
+])
+def test_chamada_escrita_como_texto_e_reconhecida(texto: str) -> None:
+    chamada = chamada_escrita_como_texto(texto, NOMES)
+    assert chamada is not None and chamada.nome == "responder"
+    assert chamada.argumentos["tipo"] in ("resposta", "sem_resposta")
+
+
+@pytest.mark.parametrize("texto", [
+    "A resposta é 625 pedidos.",
+    'apagar_tudo({"sql": "DROP TABLE x"})',           # ferramenta não declarada
+    'responder({"tipo": "resposta", "texto": )',       # JSON inválido
+    'Vou chamar responder({"tipo": "resposta", "texto": "x"}) agora.',  # texto em volta
+    'responder(["lista"])',
+    '<tool_call>{"name": "outra", "arguments": {}}</tool_call>',
+])
+def test_texto_que_nao_e_uma_chamada_valida_nao_vira_chamada(texto: str) -> None:
+    assert chamada_escrita_como_texto(texto, NOMES) is None
+
+
+def test_provedor_local_conta_as_chamadas_lidas_do_texto() -> None:
+    def transporte(url: str, corpo: Any, cabecalhos: Any, t: float) -> Any:
+        return {"message": {"content": 'responder({"tipo": "resposta", "texto": "ok"})'}}
+
+    provedor = ProvedorOllama("m", transporte=transporte)
+    resposta = provedor.gerar("s", [], [{"name": "responder"}])
+    assert resposta.chamadas[0].nome == "responder" and resposta.texto == ""
+    assert provedor.chamadas_lidas_do_texto == 1
+    # sem a ferramenta declarada, o mesmo texto continua sendo só texto
+    assert ProvedorOllama("m", transporte=transporte).gerar("s", [], []).chamadas == []
