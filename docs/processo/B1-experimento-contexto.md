@@ -92,7 +92,12 @@ Outras medidas do nível `esquema`:
 
 ### Observações, fora da regra de decisão
 
-- **Onde a linha de base caiu:** os erros novos dela no nível `esquema` estão em perguntas que dependem de saber os valores da coluna de situação e a forma das datas (`t21`, `t22`, `t27`, `t28`, `t37`, `t41`). É o que a hipótese apontava, mas foi olhado depois dos resultados e não vale como evidência independente.
+- **Onde a linha de base caiu** (consultas conferidas uma a uma):
+  - em `t28`, `t37` e `t41` ela adivinhou o valor da situação em português (`'cancelado'`, `'entregue'`); nos dados o valor está em inglês, e o resultado veio zero ou vazio;
+  - em `t21` e `t22` ela não filtrou os pedidos entregues, e por pouco não acertou (88.649 contra 88.644);
+  - em `t27` ela errou a numeração dos dias da semana, o que não tem relação com a documentação.
+
+  Cinco dos seis erros são do tipo que a hipótese apontava. Isso foi olhado depois dos resultados e não vale como evidência independente.
 - **O agente também errou perguntas que acertava com o dicionário** (`t06`, `t21`, `t22`) e passou a acertar outras. Os 39 não são as mesmas 39.
 - **O agente piorou nas ambíguas com menos documentação:** 2 de 8, contra 4 de 8. Com 8 perguntas, é só uma observação.
 - **O agente com esquema custou menos que o agente com dicionário** (166 mil contra 271 mil tokens de entrada) e acertou o mesmo.
