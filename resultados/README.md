@@ -95,6 +95,22 @@ como erro, o agente teria 42 de 44 e a linha de base 43 de 44. O critério ofici
 sendo o estrito, que era o do plano. Esta leitura só serve para dizer onde os erros estão:
 quase todos são de forma, e não de lógica. Ela não muda a conclusão 1.
 
+### Experimento em andamento: menos documentação no prompt
+
+Pré-registrado em [B1-experimento-contexto.md](../docs/processo/B1-experimento-contexto.md).
+**Parcial, sem conclusão:** a cota gratuita acabou depois de duas das oito rodadas.
+
+| Documentação no prompt | Agente | Linha de base |
+|---|---:|---:|
+| Dicionário completo | 39 / 44 | 41 / 44 |
+| Só o esquema (colunas e tipos) | 39 / 44 | 36 / 44 |
+| Só os nomes das visões | não medido | não medido |
+
+Com menos documentação, a linha de base caiu e o agente não. É a direção que a hipótese
+previa, mas o ruído entre rodadas iguais ainda não foi medido, então a diferença pode ser
+variação. Rastros: `teste-agente-lite-esquema.jsonl` e `teste-direto-lite-esquema.jsonl`.
+O arquivo `teste-agente-lite-nenhum-INCOMPLETA.jsonl` tem 3 perguntas e não entra em nada.
+
 ### Limites desta medição
 
 - Uma rodada por configuração. A variação entre rodadas existe e não foi medida.

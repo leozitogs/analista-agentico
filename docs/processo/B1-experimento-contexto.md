@@ -51,4 +51,55 @@ Qualquer que seja o resultado, ele é publicado. Nenhum prompt, comparador ou pe
 
 ## Resultados
 
-*(a preencher depois das rodadas)*
+### Estado em 14/11/2026: **parcial, sem conclusão**
+
+A cota diária gratuita do modelo (500 pedidos) acabou na terceira das oito rodadas.
+
+| Rodada | Situação |
+|---|---|
+| `esquema`, agente | Completa |
+| `esquema`, linha de base | Completa |
+| `nenhum`, agente | **Interrompida na pergunta 3 de 60.** Arquivo marcado como incompleto; não entra em nada |
+| `nenhum`, linha de base | Não rodou |
+| Repetições do `completo` (2 por modo) | Não rodaram |
+
+### O que foi medido
+
+Acerto de execução, em 44:
+
+| Nível de documentação | Agente | Linha de base | Δ |
+|---|---:|---:|---:|
+| `completo` (rodada original) | 39 | 41 | −2 |
+| `esquema` | 39 | 36 | **+3** |
+| `nenhum` | não medido | não medido | — |
+
+Outras medidas do nível `esquema`:
+
+| | Agente | Linha de base |
+|---|---:|---:|
+| Tokens de entrada | 165.944 | 49.901 |
+| Chamadas de ferramenta antes de responder, por pergunta | 1,55 | 0 |
+| Sem resposta nos dados: disse que não dá | 7 / 8 | 6 / 8 |
+| Ambíguas: pediu esclarecimento | 2 / 8 | 5 / 8 |
+| Falhas do provedor (resposta vazia) | 0 | 2 |
+
+### Leitura contra a regra de decisão
+
+- **A previsão Δ(`esquema`) ≥ +3 se cumpriu no limite exato: +3.**
+- **A regra pedia mais do que isso:** que a diferença para o nível `completo` fosse maior que o ruído entre rodadas iguais. O ruído **não foi medido**, porque as repetições não rodaram. Sem ele, um deslocamento de 5 perguntas em 44 pode ser só variação.
+- **Portanto: não há conclusão ainda.** O que existe é uma direção compatível com a hipótese. O acerto do agente ficou igual (39 e 39), e o da linha de base caiu de 41 para 36. Era o padrão previsto: quem perde com menos documentação é quem não pode ir buscá-la.
+- A previsão para o nível `nenhum` não foi testada.
+
+### Observações, fora da regra de decisão
+
+- **Onde a linha de base caiu:** os erros novos dela no nível `esquema` estão em perguntas que dependem de saber os valores da coluna de situação e a forma das datas (`t21`, `t22`, `t27`, `t28`, `t37`, `t41`). É o que a hipótese apontava, mas foi olhado depois dos resultados e não vale como evidência independente.
+- **O agente também errou perguntas que acertava com o dicionário** (`t06`, `t21`, `t22`) e passou a acertar outras. Os 39 não são as mesmas 39.
+- **O agente piorou nas ambíguas com menos documentação:** 2 de 8, contra 4 de 8. Com 8 perguntas, é só uma observação.
+- **O agente com esquema custou menos que o agente com dicionário** (166 mil contra 271 mil tokens de entrada) e acertou o mesmo.
+
+### O que falta para concluir
+
+1. As duas rodadas do nível `nenhum`.
+2. As quatro repetições do nível `completo`, que medem o ruído.
+
+São cerca de 700 pedidos; com o limite gratuito de 500 por dia, cabem em dois dias. A ordem que dá conclusão mais cedo é a das repetições primeiro.

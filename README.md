@@ -8,6 +8,10 @@
 > foi melhor que a linha de base**, e gastou o dobro de tokens. Dos seis critérios do
 > plano, quatro foram atingidos, um não foi e um ainda não foi medido.
 > [Números, leitura e limites](resultados/README.md).
+>
+> **Em andamento:** um experimento pré-registrado testa se o agente só se paga quando a
+> documentação do banco é incompleta. O primeiro resultado aponta nessa direção (com só
+> o esquema no prompt, 39 contra 36), mas ainda não há conclusão.
 
 Um agente que responde perguntas de negócio em português sobre um dataset público
 brasileiro de marketplace: escreve SQL somente leitura, executa, e devolve a resposta com
@@ -81,8 +85,7 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollam
 ## O que falta
 
 - Revisão humana do SQL dos gabaritos (o revisor viu as perguntas e as respostas, não o SQL).
-- Testar a hipótese de por que o agente não ganha: rodar os dois modos sem o dicionário de dados no prompt.
-- Medir a variação entre rodadas.
+- Terminar o experimento do contexto: nível `nenhum` e as repetições que medem o ruído entre rodadas (interrompido pela cota gratuita).
 - Os ataques de injeção pelos dados, a demo e o relatório (B2).
 
 ## Limitações conhecidas
