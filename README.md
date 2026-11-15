@@ -85,6 +85,7 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollam
 ## O que falta
 
 - Revisão humana do SQL dos gabaritos (o revisor viu as perguntas e as respostas, não o SQL).
+- **Destilação** (planejada, nada rodou): ajustar um modelo pequeno para esta tarefa e medir no mesmo teste. Plano e critérios em [docs/processo/D0-destilacao-plano.md](docs/processo/D0-destilacao-plano.md).
 - Terminar o experimento do contexto: nível `nenhum` e as repetições que medem o ruído entre rodadas (interrompido pela cota gratuita).
 - Os ataques de injeção pelos dados, a demo e o relatório (B2).
 
