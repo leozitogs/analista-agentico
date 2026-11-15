@@ -1,0 +1,41 @@
+{
+  "modelo_base": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+  "argumentos": {
+    "modelo": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    "treino": "D:\\analista-treino\\trabalho\\treino.jsonl",
+    "saida": "D:\\analista-treino\\trabalho\\adaptador-v1",
+    "epocas": "3",
+    "lote": "2",
+    "acumular": "4",
+    "taxa": "0.0002",
+    "posto": "16",
+    "maximo_de_tokens": "1024",
+    "validacao": "0.05",
+    "semente": "7",
+    "sem_4_bits": "False"
+  },
+  "exemplos_de_treino": 1219,
+  "exemplos_de_validacao": 64,
+  "descartados_por_tamanho": 0,
+  "parametros_treinaveis": 18464768,
+  "historico": [
+    {
+      "epoca": 1,
+      "perda_treino": 0.4101,
+      "perda_validacao": 0.4066
+    },
+    {
+      "epoca": 2,
+      "perda_treino": 0.2203,
+      "perda_validacao": 0.3755
+    },
+    {
+      "epoca": 3,
+      "perda_treino": 0.1269,
+      "perda_validacao": 0.4018
+    }
+  ],
+  "minutos": 32.0,
+  "memoria_de_video_no_pico_gb": 4.5,
+  "torch": "2.15.0+cu132"
+}

@@ -24,7 +24,7 @@ A maior semelhança de texto que sobrou entre uma pergunta de treino e uma de te
 ## O que saber antes de usar
 
 - **A meta era de 1.500 a 3.000 pares; ficaram 1.283.** A cota diária do professor não permitiu mais numa rodada.
-- **O filtro de concordância cortou 28% das consultas que executavam**, e corta mais o que é difícil. Há 34 exemplos de função de janela contra 125 de junção com agrupamento.
+- **O filtro de concordância cortou cerca de um terço das consultas que executavam** (559 de aproximadamente 1.680), e corta mais o que é difícil. Há 34 exemplos de função de janela contra 125 de junção com agrupamento.
 - **O filtro por resultado tirou dez vezes mais pares que o filtro por texto** (109 contra 11). Sem ele, o treino teria dezenas de perguntas do teste escritas com outras palavras.
 - **O professor erra.** Dois acertos iguais do professor não garantem que a consulta responde à pergunta.
 - O professor recebeu o mesmo dicionário de dados que orientou quem escreveu o teste; os padrões do teste estão cobertos aqui, com outras perguntas.

@@ -9,6 +9,12 @@
 > plano, quatro foram atingidos, um não foi e um ainda não foi medido.
 > [Números, leitura e limites](resultados/README.md).
 >
+> **Destilação** (pré-registrada): um modelo aberto de 1,5 bilhão de parâmetros, ajustado com
+> LoRA numa placa de 6 GB com 1.283 pares escritos pelo Gemini e filtrados automaticamente,
+> passou de 18 para **32 de 44** no mesmo teste. O professor, no mesmo contexto, faz 36. Dos
+> cinco critérios, três foram atingidos, um não e um está parcial.
+> [Resultado, auditoria de vazamento e limites](docs/processo/D2-aluno-ajustado.md).
+>
 > **Em andamento:** um experimento pré-registrado testa se o agente só se paga quando a
 > documentação do banco é incompleta. O primeiro resultado aponta nessa direção (com só
 > o esquema no prompt, 39 contra 36), mas ainda não há conclusão.
@@ -32,6 +38,7 @@ O plano completo, com critérios de sucesso escritos antes de qualquer medição
 | Comparador | `src/analista/comparar.py` | Acerto de execução sem crédito parcial; tolerância numérica relativa, com arredondamento aceito a partir de 2 casas |
 | Agente | `src/analista/agente.py`, `provedor.py` | Um laço com Gemini pela API REST. Termina com uma resposta tipada: resposta, sem resposta ou pedido de esclarecimento. A consulta final passa pela política e é executada pelo agente |
 | Modelo local | `src/analista/provedor.py` (`ProvedorOllama`) | O mesmo agente roda num modelo servido pelo Ollama, sem cota e sem custo por chamada. Basta usar `ollama:<nome>` como modelo |
+| Destilação | `src/analista/destilacao.py`, `scripts/aluno_*.py`, `dados/destilacao/` | Pares de treino escritos por um modelo professor e filtrados por execução, por concordância e por vazamento; treino de um modelo pequeno com LoRA; medição com o mesmo comparador |
 | Verificação de números | `src/analista/verificar.py` | Todo número do texto final precisa estar no resultado da consulta |
 | Avaliação | `src/analista/avaliar.py` | Acerto por nível, linha de base sem ferramentas (modo `direto`) e rastro completo de cada execução |
 | Perguntas de desenvolvimento | `avaliacao/perguntas/desenvolvimento.jsonl` | 20 perguntas, usadas para construir e ajustar |
@@ -85,7 +92,7 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollam
 ## O que falta
 
 - Revisão humana do SQL dos gabaritos (o revisor viu as perguntas e as respostas, não o SQL).
-- **Destilação** (em andamento): ajustar um modelo pequeno para esta tarefa e medir no mesmo teste. Plano e critérios em [D0](docs/processo/D0-destilacao-plano.md). Medido até aqui só o aluno **sem ajuste**: 18 de 44 ([D1](docs/processo/D1-aluno-sem-ajuste.md)). Nenhum dado de treino gerado, nenhum treino feito.
+- Publicar o modelo ajustado no Hugging Face, com o cartão; refazer o treino com outra semente para medir a variação.
 - Terminar o experimento do contexto: nível `nenhum` e as repetições que medem o ruído entre rodadas (interrompido pela cota gratuita).
 - Os ataques de injeção pelos dados, a demo e o relatório (B2).
 

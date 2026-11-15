@@ -111,6 +111,23 @@ previa, mas o ruído entre rodadas iguais ainda não foi medido, então a difere
 variação. Rastros: `teste-agente-lite-esquema.jsonl` e `teste-direto-lite-esquema.jsonl`.
 O arquivo `teste-agente-lite-nenhum-INCOMPLETA.jsonl` tem 3 perguntas e não entra em nada.
 
+### Destilação: um modelo pequeno ajustado para esta tarefa
+
+Pré-registrada em [D0](../docs/processo/D0-destilacao-plano.md); resultado e auditoria em
+[D2](../docs/processo/D2-aluno-ajustado.md). Aluno: `Qwen2.5-Coder-1.5B-Instruct`, uma
+chamada, só o esquema no prompt.
+
+| | Acerto de execução (44) | Recusou o que não tem resposta (8) | Pediu esclarecimento (8) |
+|---|---:|---:|---:|
+| Aluno sem ajuste | 18 | 0 | 0 |
+| **Aluno ajustado (LoRA, 1.283 pares)** | **32** | 5 | 8 |
+| Professor (Gemini lite), só o esquema | 36 | 6 | 5 |
+| Professor, dicionário completo | 41 | 6 | 6 |
+
+Diferença pareada entre o aluno ajustado e o sem ajuste: +14 acertos, intervalo de 95% de
++7 a +21. O treino cobre os mesmos moldes de pergunta do teste, sem repetir nenhuma:
+é generalização dentro deste banco, não além dele. Uma rodada de treino, uma semente.
+
 ### Limites desta medição
 
 - Uma rodada por configuração. A variação entre rodadas existe e não foi medida.
