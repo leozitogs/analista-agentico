@@ -8,9 +8,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import sintetico
-from .agente import Agente
+from .agente import Agente, dicionario_resumido
 from .avaliar import avaliar
 from .banco import carregar
+from .destilacao import destilar
 from .ferramentas import ErroDeConsulta, Ferramentas
 from .perguntas import ler
 from .politica import ConsultaRecusada
@@ -55,6 +56,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     av.add_argument("--saida", type=Path, default=None, help="JSONL com os rastros")
     av.add_argument("--banco", type=Path, default=BANCO_PADRAO)
 
+    gp = comandos.add_parser("gerar-pares", help="gera pares de treino com o modelo professor")
+    gp.add_argument("--saida", type=Path, required=True, help="JSONL com os pares aprovados")
+    gp.add_argument("--lotes", type=int, default=1, help="lotes por habilidade")
+    gp.add_argument("--recusas", type=int, default=0, help="exemplos de cada tipo de recusa")
+    gp.add_argument("--modelo", default=None)
+    gp.add_argument("--banco", type=Path, default=BANCO_PADRAO)
+    gp.add_argument("--teste", type=Path, default=Path("avaliacao/perguntas/teste.jsonl"))
+    gp.add_argument(
+        "--exemplos", type=Path, default=Path("avaliacao/perguntas/desenvolvimento.jsonl")
+    )
+
     args = parser.parse_args(argv)
 
     if args.comando == "carregar":
@@ -75,6 +87,29 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     ferramentas = Ferramentas(args.banco)
     try:
+        if args.comando == "gerar-pares":
+            # As perguntas de teste só são lidas para o filtro de vazamento; nunca vão ao modelo.
+            de_teste = [p.pergunta for p in ler(args.teste)]
+            de_estilo = [p.pergunta for p in ler(args.exemplos) if p.sql][:8]
+            try:
+                pares, funil = destilar(
+                    criar_provedor(args.modelo), ferramentas, dicionario_resumido(), de_teste,
+                    lotes_por_habilidade=args.lotes, recusas_de_cada_tipo=args.recusas,
+                    exemplos=de_estilo,
+                )
+            except ErroDeProvedor as erro:
+                print(f"interrompido: {erro}")
+                return 2
+            args.saida.parent.mkdir(parents=True, exist_ok=True)
+            args.saida.write_text(
+                "\n".join(json.dumps(p.model_dump(), ensure_ascii=False) for p in pares) + "\n",
+                encoding="utf-8",
+            )
+            args.saida.with_suffix(".funil.json").write_text(
+                json.dumps(funil.model_dump(), ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            print(json.dumps(funil.model_dump(), ensure_ascii=False, indent=2))
+            return 0
         if args.comando in ("perguntar", "avaliar"):
             try:
                 agente = Agente(
