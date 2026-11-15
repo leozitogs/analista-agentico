@@ -1,28 +1,42 @@
 # Analista de dados agêntico
 
-> **Em construção.** Faltam os ataques de injeção pelos dados e a demo.
->
-> **Resultado no conjunto de teste** (60 perguntas congeladas antes da rodada, Gemini 3.5
-> Flash Lite, uma rodada): o agente acertou 39 de 44 consultas (88,6%) e a linha de base,
-> que faz uma consulta só e não usa ferramentas, acertou 41 de 44 (93,2%). **O agente não
-> foi melhor que a linha de base**, e gastou o dobro de tokens. Dos seis critérios do
-> plano, quatro foram atingidos, um não foi e um ainda não foi medido.
-> [Números, leitura e limites](resultados/README.md).
->
-> **Destilação** (pré-registrada): um modelo aberto de 1,5 bilhão de parâmetros, ajustado com
-> LoRA numa placa de 6 GB com 1.283 pares escritos pelo Gemini e filtrados automaticamente,
-> passou de 18 para **32 de 44** no mesmo teste. O professor, no mesmo contexto, faz 36. Dos
-> cinco critérios, três foram atingidos, um não e um está parcial.
-> [Resultado, auditoria de vazamento e limites](docs/processo/D2-aluno-ajustado.md).
->
-> **Em andamento:** um experimento pré-registrado testa se o agente só se paga quando a
-> documentação do banco é incompleta. O primeiro resultado aponta nessa direção (com só
-> o esquema no prompt, 39 contra 36), mas ainda não há conclusão.
+![Um modelo de 1,5B que escreve SQL a partir de perguntas em português: de 18 para 32 de 44 consultas certas](docs/imagens/capa.png)
 
-Um agente que responde perguntas de negócio em português sobre um dataset público
-brasileiro de marketplace: escreve SQL somente leitura, executa, e devolve a resposta com
-a consulta usada. O que interessa aqui não é o agente, é **quanto dá para confiar nele**:
-acerto medido contra gabarito e resistência a instruções escondidas nos dados.
+Perguntas de negócio em português sobre um dataset público brasileiro de marketplace viram
+SQL somente leitura, executado num banco travado, com a consulta sempre à vista. O que
+interessa aqui não é o agente, é **quanto dá para confiar nele**: acerto medido contra
+gabarito, critérios escritos antes de medir e resultados publicados mesmo quando não
+favorecem a ideia.
+
+| | Resultado no conjunto de teste (congelado antes de qualquer rodada) |
+|---|---|
+| **Agente com Gemini 3.5 Flash Lite** | 39 de 44 consultas certas. A linha de base, sem ferramentas, fez 41: **o agente não ganhou** e gastou o dobro de tokens ([números e limites](resultados/README.md)) |
+| **Destilação para um modelo de 1,5B** | De **18 para 32 de 44** com LoRA numa placa de 6 GB; o professor faz 36 ([abaixo](#destilação-um-modelo-pequeno-que-roda-num-notebook)) |
+| **Segurança do SQL** | Política na árvore sintática e conexão somente leitura, sem acesso externo; uma revisão independente achou contornos, todos corrigidos e transformados em teste |
+
+> **Em construção.** Faltam os ataques de injeção pelos dados e a demo. Um experimento
+> pré-registrado testa se o agente só se paga quando a documentação do banco é incompleta;
+> o primeiro resultado aponta nessa direção (com só o esquema no prompt, 39 contra 36), mas
+> ainda não há conclusão.
+
+## Destilação: um modelo pequeno que roda num notebook
+
+O Gemini escreveu os exemplos; filtros automáticos jogaram fora o que não executava, o que
+ele mesmo não confirmava às cegas e tudo o que se parecia com o teste; um
+`Qwen2.5-Coder-1.5B` aprendeu com o resto em 32 minutos numa RTX 4050. O plano e os
+critérios foram publicados antes do treino ([pré-registro](docs/processo/D0-destilacao-plano.md)).
+
+![Antes e depois do ajuste no conjunto de teste](docs/imagens/resultado.svg)
+
+![Funil dos filtros: de 2.189 pares escritos a 1.283 usados no treino](docs/imagens/funil.svg)
+
+O modelo passou a recusar o que os dados não respondem e a perguntar quando a pergunta é
+ambígua, coisas que antes não fazia nenhuma vez. **Os limites vêm junto com o número:** um
+banco só, um treino, uma semente, e em 15 das 44 perguntas o treino tem uma irmã do mesmo
+molde ([resultado, auditoria de vazamento e limites](docs/processo/D2-aluno-ajustado.md)).
+O adaptador está no Hugging Face: [`leozitogs/analista-olist-qwen2.5-coder-1.5b-lora`](https://huggingface.co/leozitogs/analista-olist-qwen2.5-coder-1.5b-lora)
+([cartão do modelo](docs/cartao-do-modelo.md)). As figuras saem dos arquivos de resultado
+com `python scripts/figuras_destilacao.py`.
 
 O plano completo, com critérios de sucesso escritos antes de qualquer medição, está em
 [PLANO.md](PLANO.md).
@@ -92,7 +106,7 @@ uv run analista avaliar avaliacao/perguntas/desenvolvimento.jsonl --modelo ollam
 ## O que falta
 
 - Revisão humana do SQL dos gabaritos (o revisor viu as perguntas e as respostas, não o SQL).
-- Publicar o modelo ajustado no Hugging Face, com o cartão; refazer o treino com outra semente para medir a variação.
+- Refazer o treino da destilação com outra semente para medir a variação.
 - Terminar o experimento do contexto: nível `nenhum` e as repetições que medem o ruído entre rodadas (interrompido pela cota gratuita).
 - Os ataques de injeção pelos dados, a demo e o relatório (B2).
 
