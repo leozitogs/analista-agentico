@@ -8,10 +8,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import sintetico
-from .agente import Agente, dicionario_resumido
-from .avaliar import avaliar
+from .agente import Agente, contexto_do_banco, dicionario_resumido
+from .avaliar import Linha, avaliar, julgar, para_rastro, resumir_linhas
 from .banco import carregar
-from .destilacao import destilar
+from .destilacao import Par, alvo_do_aluno, destilar, execucao_do_aluno, mensagens_do_aluno
 from .ferramentas import ErroDeConsulta, Ferramentas
 from .perguntas import ler
 from .politica import ConsultaRecusada
@@ -67,6 +67,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--exemplos", type=Path, default=Path("avaliacao/perguntas/desenvolvimento.jsonl")
     )
 
+    ep = comandos.add_parser("exportar-prompts", help="escreve os prompts do aluno em JSONL")
+    ep.add_argument("perguntas", type=Path)
+    ep.add_argument("--saida", type=Path, required=True)
+    ep.add_argument("--banco", type=Path, default=BANCO_PADRAO)
+
+    et = comandos.add_parser("exportar-treino", help="pares aprovados viram exemplos de treino")
+    et.add_argument("pares", type=Path)
+    et.add_argument("--saida", type=Path, required=True)
+    et.add_argument("--banco", type=Path, default=BANCO_PADRAO)
+
+    aa = comandos.add_parser("avaliar-aluno", help="julga as saídas de um modelo aluno")
+    aa.add_argument("perguntas", type=Path)
+    aa.add_argument("saidas", type=Path, help='JSONL com {"id": ..., "saida": ...}')
+    aa.add_argument("--nome", required=True, help="nome do modelo, para o rastro")
+    aa.add_argument("--saida", type=Path, default=None, help="JSONL com os rastros")
+    aa.add_argument("--banco", type=Path, default=BANCO_PADRAO)
+
     args = parser.parse_args(argv)
 
     if args.comando == "carregar":
@@ -87,6 +104,60 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     ferramentas = Ferramentas(args.banco)
     try:
+        if args.comando == "exportar-prompts":
+            esquema = contexto_do_banco("esquema", ferramentas)
+            linhas_de_prompt = []
+            for pergunta in ler(args.perguntas):
+                sistema, usuario = mensagens_do_aluno(pergunta.pergunta, esquema)
+                prompt = {"id": pergunta.id, "sistema": sistema, "usuario": usuario}
+                linhas_de_prompt.append(json.dumps(prompt, ensure_ascii=False))
+            args.saida.parent.mkdir(parents=True, exist_ok=True)
+            args.saida.write_text("\n".join(linhas_de_prompt) + "\n", encoding="utf-8")
+            print(f"{len(linhas_de_prompt)} prompts em {args.saida}")
+            return 0
+        if args.comando == "exportar-treino":
+            esquema = contexto_do_banco("esquema", ferramentas)
+            exemplos_de_treino = []
+            for bruta in args.pares.read_text(encoding="utf-8").splitlines():
+                if not bruta.strip():
+                    continue
+                par = Par.model_validate_json(bruta)
+                sistema, usuario = mensagens_do_aluno(par.pergunta, esquema)
+                exemplo = {"sistema": sistema, "usuario": usuario, "alvo": alvo_do_aluno(par)}
+                exemplos_de_treino.append(json.dumps(exemplo, ensure_ascii=False))
+            args.saida.parent.mkdir(parents=True, exist_ok=True)
+            args.saida.write_text("\n".join(exemplos_de_treino) + "\n", encoding="utf-8")
+            print(f"{len(exemplos_de_treino)} exemplos de treino em {args.saida}")
+            return 0
+        if args.comando == "avaliar-aluno":
+            saidas = {
+                json.loads(x)["id"]: json.loads(x)["saida"]
+                for x in args.saidas.read_text(encoding="utf-8").splitlines() if x.strip()
+            }
+            juiz = Ferramentas(args.banco)
+            julgadas: list[Linha] = []
+            try:
+                for pergunta in ler(args.perguntas):
+                    # pergunta sem saída do modelo conta como falha, não some
+                    execucao = execucao_do_aluno(
+                        pergunta.pergunta, saidas.get(pergunta.id, ""), ferramentas, args.nome)
+                    acertou, motivo = julgar(pergunta, execucao, juiz)
+                    julgadas.append(Linha(
+                        id=pergunta.id, nivel=pergunta.nivel, tipo_pergunta=pergunta.tipo,
+                        acertou=acertou, motivo=motivo, execucao=execucao))
+            finally:
+                juiz.fechar()
+            if args.saida is not None:
+                args.saida.parent.mkdir(parents=True, exist_ok=True)
+                args.saida.write_text(
+                    "\n".join(json.dumps(para_rastro(x), ensure_ascii=False) for x in julgadas)
+                    + "\n", encoding="utf-8")
+            for linha in julgadas:
+                marca = "ACERTOU" if linha.acertou else "errou  "
+                print(f"{linha.id}  {marca}  {linha.motivo[:90]}")
+            resumo_do_aluno = resumir_linhas(args.nome, "direto", "esquema", julgadas)
+            print(json.dumps(resumo_do_aluno.model_dump(), ensure_ascii=False, indent=2))
+            return 0
         if args.comando == "gerar-pares":
             # As perguntas de teste só são lidas para o filtro de vazamento; nunca vão ao modelo.
             de_teste = [p.pergunta for p in ler(args.teste)]

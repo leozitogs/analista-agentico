@@ -22,6 +22,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from .agente import Execucao
 from .comparar import resultados_iguais
 from .ferramentas import ErroDeConsulta, Ferramentas, Resultado
 from .politica import ConsultaRecusada
@@ -303,3 +304,30 @@ def destilar(
 
 def contagem_por_tipo(pares: Sequence[Par]) -> dict[str, int]:
     return dict(Counter(p.tipo for p in pares))
+
+
+# ---------------------------------------------------------------- medir o aluno
+
+def mensagens_do_aluno(pergunta: str, esquema: str) -> tuple[str, str]:
+    """(sistema, usuário) exatamente como o aluno vê, no treino e na medição."""
+    return f"{SISTEMA_DO_ALUNO}\n\n{esquema}", pergunta
+
+
+def execucao_do_aluno(
+    pergunta: str, saida: str, ferramentas: Ferramentas, nome_do_modelo: str
+) -> Execucao:
+    """Transforma o texto que o aluno escreveu numa execução julgável como as outras."""
+    execucao = Execucao(pergunta=pergunta, modo="direto", contexto="esquema",
+                        provedor=nome_do_modelo, chamadas_ao_modelo=1)
+    tipo, conteudo = ler_saida_do_aluno(saida)
+    if tipo != "resposta":
+        execucao.tipo, execucao.texto = tipo, conteudo  # type: ignore[assignment]
+        return execucao
+    try:
+        resultado = ferramentas.executar_sql(conteudo, MAX_LINHAS)
+    except (ConsultaRecusada, ErroDeConsulta) as erro:
+        execucao.erro = f"consulta do aluno recusada ou com erro: {erro}"
+        execucao.texto = conteudo[:500]
+        return execucao
+    execucao.tipo, execucao.sql, execucao.resultado = "resposta", resultado.sql, resultado
+    return execucao

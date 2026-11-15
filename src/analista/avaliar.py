@@ -149,15 +149,19 @@ def avaliar(
 
 
 def resumir(agente: Agente, linhas: list[Linha]) -> Resumo:
+    return resumir_linhas(agente.provedor.nome, agente.modo, agente.contexto, linhas)
+
+
+def resumir_linhas(provedor: str, modo: str, contexto: str, linhas: list[Linha]) -> Resumo:
     grupos: dict[str, list[bool]] = {}
     for linha in linhas:
         grupo = f"nivel {linha.nivel}" if linha.tipo_pergunta == "sql" else linha.tipo_pergunta
         grupos.setdefault(grupo, []).append(linha.acertou)
     execucoes = [linha.execucao for linha in linhas]
     return Resumo(
-        provedor=agente.provedor.nome,
-        modo=agente.modo,
-        contexto=agente.contexto,
+        provedor=provedor,
+        modo=modo,
+        contexto=contexto,
         total=len(linhas),
         acertos=sum(linha.acertou for linha in linhas),
         por_grupo={g: (sum(v), len(v)) for g, v in sorted(grupos.items())},
