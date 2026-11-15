@@ -76,3 +76,15 @@ Em nenhum caso o conjunto de teste, o comparador ou os critérios mudam depois d
 - **Quem escreveu o teste conhece as armadilhas** que o professor também vai receber. O treino pode cobrir os mesmos padrões do teste sem repetir nenhuma pergunta. Isso é generalização dentro do domínio, não fora dele.
 - **Os dados são da Olist, sob CC BY-NC-SA 4.0.** O modelo ajustado e os pares de treino derivam deles e saem sob a mesma licença, para uso não comercial.
 - **Cota:** o professor tem 500 pedidos gratuitos por dia, divididos com o experimento do contexto, que ainda tem seis rodadas pendentes.
+
+## Adendo de 15/11/2026, antes da geração grande e de qualquer treino
+
+Uma rodada piloto (13 pedidos ao professor, 140 pares escritos, 106 aprovados) mostrou uma falha no controle de vazamento descrito acima. O limiar de 0,85 de semelhança de texto deixa passar a **mesma pergunta escrita com outras palavras**. Exemplo real do piloto: "Quantos produtos cadastrados nunca foram vendidos em nenhum pedido?" (treino, semelhança de 0,81) contra "Quantos produtos cadastrados nunca apareceram em nenhum item de pedido?" (teste).
+
+Mudança, **só no sentido de mais rigor**: além do filtro por texto, entra um filtro por resultado. Todo par de treino cuja consulta devolve o mesmo resultado que algum gabarito de teste é descartado. O critério D4 continua como estava e passa a ter um segundo número publicado: quantos pares caíram por resultado.
+
+O que isso **não** resolve, e fica dito: o professor recebe o mesmo dicionário que orientou quem escreveu o teste. O treino vai cobrir os mesmos padrões (antijunção, pessoa contra cliente, valores de situação em inglês) com outras perguntas. O resultado mede generalização dentro deste banco, e não além dele.
+
+Outras observações do piloto, sem mudança de plano:
+- o filtro de concordância cortou 30% das consultas (33 de 109);
+- ele corta mais as habilidades difíceis: sobraram 2 exemplos de janela e 2 de duas etapas, contra 10 de junção simples. O conjunto de treino vai ser desbalanceado para o fácil, e o nível 3 do teste é onde o aluno mais precisa melhorar.

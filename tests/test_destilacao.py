@@ -5,10 +5,13 @@ import json
 from analista.destilacao import (
     Par,
     alvo_do_aluno,
+    conferir_em_etapas,
     destilar,
+    escrever_em_etapas,
     filtrar_por_concordancia,
     filtrar_por_execucao,
     filtrar_vazamento,
+    filtrar_vazamento_por_resultado,
     ler_saida_do_aluno,
     pedir_pares,
     pedir_recusas,
@@ -16,7 +19,7 @@ from analista.destilacao import (
     semelhanca,
 )
 from analista.ferramentas import Ferramentas
-from analista.provedor import ProvedorRoteirizado
+from analista.provedor import ErroDeCota, ProvedorRoteirizado
 
 CONTAGEM = "SELECT count(*) FROM pedidos"
 CANCELADOS = "SELECT count(*) FROM pedidos WHERE situacao = 'canceled'"
@@ -144,3 +147,60 @@ def test_funil_conta_cada_etapa(ferramentas: Ferramentas) -> None:
     assert funil.descartes == {"execucao": 1, "concordancia": 1, "vazamento": 1}
     assert funil.pedidos_ao_professor == 14
     assert sorted(p.tipo for p in pares) == ["ambigua", "sem_resposta", "sql"]
+
+
+class AcabaACota(ProvedorRoteirizado):
+    """Devolve o roteiro e, quando ele acaba, a cota também acaba."""
+
+    def gerar(self, sistema, conteudos, ferramentas):  # type: ignore[no-untyped-def]
+        if not self._roteiro:
+            raise ErroDeCota("HTTP 429: per day")
+        return super().gerar(sistema, conteudos, ferramentas)
+
+
+def test_escrita_em_etapas_para_na_cota_e_retoma_de_onde_parou() -> None:
+    um = lote(("Quantos pedidos existem?", CONTAGEM))
+    primeira = list(escrever_em_etapas(AcabaACota([um] * 3), "(dic)", lotes_por_habilidade=1))
+    assert [numero for numero, _ in primeira] == [0, 1, 2]  # parou sem erro no quarto
+    provedor = AcabaACota([um] * 20)
+    segunda = list(escrever_em_etapas(provedor, "(dic)", lotes_por_habilidade=1,
+                                      recusas_de_cada_tipo=15, pular=3))
+    assert [numero for numero, _ in segunda] == list(range(3, 13))  # 11 habilidades + 2 recusas
+    # cada lote recebe um tema, e o tema muda de um lote para o outro
+    temas = {c[0]["parts"][0]["text"].split("perguntas sobre ")[1].split(".")[0]
+             for c in provedor.recebidos[:8]}
+    assert len(temas) == 8
+
+
+def test_conferencia_em_etapas_guarda_o_que_ja_foi_conferido(ferramentas: Ferramentas) -> None:
+    pares = [par(f"Quantos pedidos existem? ({i})", CONTAGEM) for i in range(25)]
+    uma_resposta = json.dumps([CONTAGEM] * 10)
+    vereditos: dict[str, bool] = {}
+    for novo in conferir_em_etapas(AcabaACota([uma_resposta]), ferramentas, "(dic)", pares,
+                                   vereditos):
+        vereditos.update(novo)
+    assert len(vereditos) == 10 and all(vereditos.values())  # a cota acabou no segundo lote
+    resto = AcabaACota([uma_resposta, json.dumps([CANCELADOS] * 5)])
+    for novo in conferir_em_etapas(resto, ferramentas, "(dic)", pares, vereditos):
+        vereditos.update(novo)
+    assert len(vereditos) == 25 and sum(vereditos.values()) == 20
+    assert len(resto.recebidos) == 2  # as 10 já conferidas não voltaram ao professor
+
+
+def test_vazamento_por_resultado_pega_a_mesma_pergunta_com_outras_palavras(
+    ferramentas: Ferramentas,
+) -> None:
+    de_teste = ["SELECT count(*) FROM pedidos p WHERE NOT EXISTS "
+                "(SELECT 1 FROM itens_pedido i WHERE i.pedido_id = p.pedido_id)", CANCELADOS]
+    pares = [
+        # mesma pergunta do teste, escrita de outro jeito e com outra consulta
+        par("Quantos pedidos foram feitos sem nenhum item associado?",
+            "SELECT count(*) FROM pedidos p LEFT JOIN itens_pedido i USING (pedido_id) "
+            "WHERE i.pedido_id IS NULL"),
+        par("Quantos pedidos existem?", CONTAGEM),
+        Par(tipo="sem_resposta", pergunta="Qual a margem?", texto="não há custo"),
+    ]
+    bons = filtrar_vazamento_por_resultado(ferramentas, pares, de_teste)
+    assert [p.pergunta for p in bons] == ["Quantos pedidos existem?", "Qual a margem?"]
+    # o filtro por texto, sozinho, deixaria passar
+    assert len(filtrar_vazamento(pares, ["Quantos pedidos não têm nenhum item?"])[0]) == 3

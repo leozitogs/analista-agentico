@@ -11,11 +11,25 @@ from . import sintetico
 from .agente import Agente, contexto_do_banco, dicionario_resumido
 from .avaliar import Linha, avaliar, julgar, para_rastro, resumir_linhas
 from .banco import carregar
-from .destilacao import Par, alvo_do_aluno, destilar, execucao_do_aluno, mensagens_do_aluno
+from .destilacao import (
+    Funil,
+    Par,
+    alvo_do_aluno,
+    conferir_em_etapas,
+    contagem_por_tipo,
+    destilar,
+    escrever_em_etapas,
+    execucao_do_aluno,
+    filtrar_por_execucao,
+    filtrar_vazamento,
+    filtrar_vazamento_por_resultado,
+    mensagens_do_aluno,
+    sem_repeticao,
+)
 from .ferramentas import ErroDeConsulta, Ferramentas
 from .perguntas import ler
 from .politica import ConsultaRecusada
-from .provedor import ErroDeProvedor, criar_provedor, listar_modelos
+from .provedor import ErroDeProvedor, ProvedorGemini, criar_provedor, listar_modelos
 
 BANCO_PADRAO = Path("dados/olist.duckdb")
 
@@ -55,6 +69,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     av.add_argument("--modelo", default=None)
     av.add_argument("--saida", type=Path, default=None, help="JSONL com os rastros")
     av.add_argument("--banco", type=Path, default=BANCO_PADRAO)
+
+    ee = comandos.add_parser("escrever-pares", help="etapa 1: o professor escreve os pares")
+    ee.add_argument("--saida", type=Path, required=True, help="JSONL, um lote por linha")
+    ee.add_argument("--lotes", type=int, default=1, help="lotes por habilidade")
+    ee.add_argument("--recusas", type=int, default=0, help="exemplos de cada tipo de recusa")
+    ee.add_argument("--modelo", default=None)
+    ee.add_argument("--temperatura", type=float, default=1.0)
+    ee.add_argument("--banco", type=Path, default=BANCO_PADRAO)
+    ee.add_argument(
+        "--exemplos", type=Path, default=Path("avaliacao/perguntas/desenvolvimento.jsonl")
+    )
+
+    fp = comandos.add_parser("filtrar-pares", help="etapa 2: execução, concordância e vazamento")
+    fp.add_argument("escritos", type=Path)
+    fp.add_argument("--saida", type=Path, required=True)
+    fp.add_argument("--modelo", default=None)
+    fp.add_argument("--banco", type=Path, default=BANCO_PADRAO)
+    fp.add_argument("--teste", type=Path, default=Path("avaliacao/perguntas/teste.jsonl"))
 
     gp = comandos.add_parser("gerar-pares", help="gera pares de treino com o modelo professor")
     gp.add_argument("--saida", type=Path, required=True, help="JSONL com os pares aprovados")
@@ -158,6 +190,86 @@ def main(argv: Sequence[str] | None = None) -> int:
             resumo_do_aluno = resumir_linhas(args.nome, "direto", "esquema", julgadas)
             print(json.dumps(resumo_do_aluno.model_dump(), ensure_ascii=False, indent=2))
             return 0
+        if args.comando == "escrever-pares":
+            de_estilo = [p.pergunta for p in ler(args.exemplos) if p.sql][:8]
+            feitos = 0
+            if args.saida.exists():
+                feitos = sum(1 for x in args.saida.read_text(encoding="utf-8").splitlines() if x)
+            try:
+                professor = ProvedorGemini(args.modelo, temperatura=args.temperatura)
+            except ErroDeProvedor as erro:
+                print(erro)
+                return 1
+            args.saida.parent.mkdir(parents=True, exist_ok=True)
+            escritos_agora = 0
+            with args.saida.open("a", encoding="utf-8", newline="\n") as arquivo:
+                for numero, lote in escrever_em_etapas(
+                    professor, dicionario_resumido(), lotes_por_habilidade=args.lotes,
+                    recusas_de_cada_tipo=args.recusas, exemplos=de_estilo, pular=feitos,
+                ):
+                    registro = {"lote": numero, "pares": [p.model_dump() for p in lote]}
+                    arquivo.write(json.dumps(registro, ensure_ascii=False) + "\n")
+                    arquivo.flush()
+                    escritos_agora += len(lote)
+            total_de_lotes = sum(
+                1 for x in args.saida.read_text(encoding="utf-8").splitlines() if x)
+            previstos = args.lotes * 11 + 2 * -(-args.recusas // 15)
+            print(f"{escritos_agora} pares escritos agora; {total_de_lotes} de {previstos} lotes")
+            return 0 if total_de_lotes >= previstos else 2
+        if args.comando == "filtrar-pares":
+            escritos = [
+                Par.model_validate(p)
+                for linha_bruta in args.escritos.read_text(encoding="utf-8").splitlines()
+                if linha_bruta.strip()
+                for p in json.loads(linha_bruta)["pares"]
+            ]
+            funil = Funil(pedidos_ao_professor=0, escritos=len(escritos))
+            unicos = sem_repeticao(escritos)
+            executam = filtrar_por_execucao(ferramentas, unicos)
+            funil.apos_execucao = len(executam)
+            marcas = args.saida.with_suffix(".concordancia.json")
+            vereditos: dict[str, bool] = (
+                json.loads(marcas.read_text(encoding="utf-8")) if marcas.exists() else {}
+            )
+            try:
+                revisor = criar_provedor(args.modelo)
+            except ErroDeProvedor as erro:
+                print(erro)
+                return 1
+            args.saida.parent.mkdir(parents=True, exist_ok=True)
+            for novo in conferir_em_etapas(
+                revisor, ferramentas, dicionario_resumido(), executam, vereditos
+            ):
+                vereditos.update(novo)
+                funil.pedidos_ao_professor += 1
+                marcas.write_text(json.dumps(vereditos, ensure_ascii=False), encoding="utf-8")
+            faltam = sum(p.tipo == "sql" and p.pergunta not in vereditos for p in executam)
+            concordam = [p for p in executam if p.tipo != "sql" or vereditos.get(p.pergunta)]
+            funil.apos_concordancia = len(concordam)
+            perguntas_de_teste = ler(args.teste)
+            de_teste = [p.pergunta for p in perguntas_de_teste]
+            sem_texto_igual, funil.maior_semelhanca_restante = filtrar_vazamento(
+                concordam, de_teste)
+            finais = filtrar_vazamento_por_resultado(
+                ferramentas, sem_texto_igual, [p.sql for p in perguntas_de_teste if p.sql])
+            funil.apos_vazamento = len(finais)
+            funil.descartes = {
+                "repetidos": len(escritos) - len(unicos),
+                "execucao": len(unicos) - len(executam),
+                "concordancia": len(executam) - len(concordam) - faltam,
+                "ainda_sem_conferir": faltam,
+                "vazamento_por_texto": len(concordam) - len(sem_texto_igual),
+                "vazamento_por_resultado": len(sem_texto_igual) - len(finais),
+            }
+            args.saida.write_text(
+                "\n".join(json.dumps(p.model_dump(), ensure_ascii=False) for p in finais) + "\n",
+                encoding="utf-8",
+            )
+            relatorio = {**funil.model_dump(), "por_tipo": contagem_por_tipo(finais)}
+            args.saida.with_suffix(".funil.json").write_text(
+                json.dumps(relatorio, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(json.dumps(relatorio, ensure_ascii=False, indent=2))
+            return 2 if faltam else 0
         if args.comando == "gerar-pares":
             # As perguntas de teste só são lidas para o filtro de vazamento; nunca vão ao modelo.
             de_teste = [p.pergunta for p in ler(args.teste)]

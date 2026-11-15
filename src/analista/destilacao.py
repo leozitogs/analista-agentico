@@ -16,7 +16,7 @@ import json
 import re
 import unicodedata
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from difflib import SequenceMatcher
 from typing import Literal
 
@@ -26,7 +26,7 @@ from .agente import Execucao
 from .comparar import resultados_iguais
 from .ferramentas import ErroDeConsulta, Ferramentas, Resultado
 from .politica import ConsultaRecusada
-from .provedor import Provedor, turno_usuario
+from .provedor import ErroDeCota, Provedor, turno_usuario
 
 LIMIAR_DE_VAZAMENTO = 0.85
 MAX_LINHAS = 5000
@@ -44,6 +44,14 @@ HABILIDADES = [
     "duas etapas: agregar primeiro e depois agregar o agregado",
     "armadilha dos dados descrita no dicionário (pessoa contra cliente, pedidos sem itens, "
     "mais de uma avaliação por pedido, valores de situação em inglês)",
+]
+
+# Cada lote recebe um tema, em rodízio, para que lotes da mesma habilidade não se repitam.
+TEMAS = [
+    "pedidos e suas situações", "prazos e atrasos de entrega", "itens, preços e frete",
+    "formas de pagamento e parcelas", "avaliações e notas", "clientes e estados",
+    "vendedores e suas cidades", "produtos e categorias", "meses e anos de compra",
+    "combinações entre vendedores, produtos e clientes",
 ]
 
 TipoDePar = Literal["sql", "sem_resposta", "ambigua"]
@@ -131,7 +139,7 @@ def _lista_json(texto: str) -> list[object]:
 
 def pedir_pares(
     provedor: Provedor, dicionario: str, habilidade: str, quantidade: int,
-    exemplos: Sequence[str] = (),
+    exemplos: Sequence[str] = (), tema: str = "",
 ) -> list[Par]:
     """Um lote de pares (pergunta, SQL) sobre uma habilidade."""
     estilo = ""
@@ -139,7 +147,9 @@ def pedir_pares(
         estilo = "\nExemplos do estilo das perguntas (não os repita):\n" + "\n".join(
             f"- {e}" for e in exemplos)
     pedido = (
-        f"Escreva {quantidade} exemplos diferentes entre si que exercitem: {habilidade}.{estilo}\n"
+        f"Escreva {quantidade} exemplos diferentes entre si que exercitem: {habilidade}."
+        + (f" Dê preferência a perguntas sobre {tema}." if tema else "")
+        + f"{estilo}\n"
         'Formato: [{"pergunta": "...", "sql": "..."}, ...]'
     )
     resposta = provedor.gerar(
@@ -253,6 +263,27 @@ def filtrar_vazamento(
     return bons, maior
 
 
+def filtrar_vazamento_por_resultado(
+    ferramentas: Ferramentas, pares: Sequence[Par], consultas_de_teste: Sequence[str]
+) -> list[Par]:
+    """Descarta o par cuja consulta devolve o mesmo resultado que um gabarito de teste.
+
+    A semelhança de texto não pega a mesma pergunta escrita com outras palavras
+    ("produtos que nunca foram vendidos" e "produtos que nunca apareceram em nenhum item").
+    O resultado pega. É um filtro conservador: uma coincidência de resultado também
+    descarta o par, e isso é aceitável.
+    """
+    gabaritos = [r for r in (_executar(ferramentas, sql) for sql in consultas_de_teste) if r]
+    bons = []
+    for par in pares:
+        if par.tipo == "sql" and par.sql:
+            resultado = _executar(ferramentas, par.sql)
+            if resultado is not None and any(resultados_iguais(resultado, g) for g in gabaritos):
+                continue
+        bons.append(par)
+    return bons
+
+
 def sem_repeticao(pares: Sequence[Par]) -> list[Par]:
     """Uma só ocorrência de cada pergunta (depois de normalizar)."""
     vistos: set[str] = set()
@@ -300,6 +331,58 @@ def destilar(
         "vazamento": funil.apos_concordancia - funil.apos_vazamento,
     }
     return finais, funil
+
+
+def escrever_em_etapas(
+    provedor: Provedor, dicionario: str, *, lotes_por_habilidade: int, pares_por_lote: int = 10,
+    recusas_de_cada_tipo: int = 0, exemplos: Sequence[str] = (), pular: int = 0,
+) -> Iterator[tuple[int, list[Par]]]:
+    """Entrega um lote por vez, numerado, para quem chama gravar antes do próximo.
+
+    ``pular`` retoma uma geração interrompida: os primeiros lotes não são pedidos de novo.
+    Para quando a cota do professor acaba, sem levantar erro.
+    """
+    plano: list[tuple[str, str, int]] = []
+    for indice in range(lotes_por_habilidade):
+        for posicao, habilidade in enumerate(HABILIDADES):
+            plano.append(("sql", habilidade, indice * len(HABILIDADES) + posicao))
+    for tipo in ("sem_resposta", "ambigua"):
+        for parte in range(-(-recusas_de_cada_tipo // 15)):
+            plano.append((tipo, tipo, parte))
+    for numero, (tipo, habilidade, ordem) in enumerate(plano):
+        if numero < pular:
+            continue
+        try:
+            if tipo == "sql":
+                lote = pedir_pares(provedor, dicionario, habilidade, pares_por_lote, exemplos,
+                                   tema=TEMAS[ordem % len(TEMAS)])
+            else:
+                lote = pedir_recusas(provedor, dicionario, tipo, 15)  # type: ignore[arg-type]
+        except ErroDeCota:
+            return
+        yield numero, lote
+
+
+def conferir_em_etapas(
+    provedor: Provedor, ferramentas: Ferramentas, dicionario: str, pares: Sequence[Par],
+    ja_conferidas: dict[str, bool], lote: int = 10,
+) -> Iterator[dict[str, bool]]:
+    """Concordância com ponto de retomada: entrega o veredito de cada lote de perguntas."""
+    pendentes = [p for p in pares if p.tipo == "sql" and p.pergunta not in ja_conferidas]
+    for inicio in range(0, len(pendentes), lote):
+        grupo = pendentes[inicio:inicio + lote]
+        try:
+            segundas = responder_as_cegas(provedor, dicionario, [p.pergunta for p in grupo])
+        except ErroDeCota:
+            return
+        veredito = {}
+        for par, segunda in zip(grupo, segundas, strict=True):
+            assert par.sql is not None
+            original, outra = _executar(ferramentas, par.sql), _executar(ferramentas, segunda)
+            veredito[par.pergunta] = bool(
+                original is not None and outra is not None and resultados_iguais(outra, original)
+            )
+        yield veredito
 
 
 def contagem_por_tipo(pares: Sequence[Par]) -> dict[str, int]:
