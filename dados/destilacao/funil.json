@@ -1,0 +1,21 @@
+{
+  "pedidos_ao_professor": 158,
+  "escritos": 2189,
+  "apos_execucao": 1962,
+  "apos_concordancia": 1403,
+  "apos_vazamento": 1283,
+  "descartes": {
+    "repetidos": 169,
+    "execucao": 58,
+    "concordancia": 559,
+    "ainda_sem_conferir": 0,
+    "vazamento_por_texto": 11,
+    "vazamento_por_resultado": 109
+  },
+  "maior_semelhanca_restante": 0.8383233532934131,
+  "por_tipo": {
+    "sql": 1004,
+    "sem_resposta": 155,
+    "ambigua": 124
+  }
+}
